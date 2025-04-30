@@ -1,37 +1,40 @@
 import re
-from urllib.parse import urlparse
 from bs4 import BeautifulSoup
-from urllib.parse import urljoin, urldefrag
+from urllib.parse import urlparse, urljoin, urldefrag
 
 def scraper(url, resp):
+    if resp.status != 200 or resp.raw_response is None:
+        print(f"Skipping {url} - status: {resp.status}")
+        return []
+
     links = extract_next_links(url, resp)
-    return [link for link in links if is_valid(link)]
+
+    valid_links = [link for link in links if is_valid(link)]
+    print(f"Returning {len(valid_links)} valid links from {url}")
+    return valid_links
 
 def extract_next_links(url, resp):
     output_links = []
-
-    if resp.status != 200 or resp.raw_response is None:
-        return output_links
-
     try:
         soup = BeautifulSoup(resp.raw_response.content, "lxml")
-        for tag in soup.find_all("a"):
-            href = tag.get("href")
+        for link_tag in soup.find_all("a"):
+            href = link_tag.get("href")
             if href:
-                joined_url = urljoin(url, href)
-                clean_url, _ = urldefrag(joined_url)
-                output_links.append(clean_url)
+                try:
+                    absolute_url = urljoin(url, href)  
+                    defragmented_url, _ = urldefrag(absolute_url)  
+                    output_links.append(defragmented_url)
+                except Exception as e:
+                    print(f"Error processing link: {href} from {url} — {e}")
     except Exception as e:
-        print(f"Error extracting links from {url}: {e}")
+        print(f"Error parsing {url}: {e}")
 
+    print(f"Found {len(output_links)} links on {url}")
     return output_links
-
-    print("Checking:", url)
 
 def is_valid(url):
     try:
         parsed = urlparse(url)
-
         if parsed.scheme not in {"http", "https"}:
             return False
 
@@ -45,14 +48,11 @@ def is_valid(url):
 
         hostname = parsed.hostname or ""
         if not any(hostname.endswith(domain) for domain in valid_domains):
-            print("❌ Rejected (not valid domain):", hostname)
             return False
 
         if "today.uci.edu" in hostname and not parsed.path.startswith("/department/information_computer_sciences"):
-            print("❌ Rejected (bad path for today.uci.edu):", parsed.path)
             return False
 
-        import re
         return not re.match(
             r".*\.(css|js|bmp|gif|jpe?g|ico"
             + r"|png|tiff?|mid|mp2|mp3|mp4"
@@ -62,9 +62,7 @@ def is_valid(url):
             + r"|epub|dll|cnf|tgz|sha1"
             + r"|thmx|mso|arff|rtf|jar|csv"
             + r"|rm|smil|wmv|swf|wma|zip|rar|gz)$",
-            parsed.path.lower()
-        )
-
+            parsed.path.lower())
     except Exception as e:
-        print(f"❌ Rejected (error): {e}")
+        print(f"Error in is_valid({url}): {e}")
         return False

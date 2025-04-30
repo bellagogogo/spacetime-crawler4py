@@ -33,9 +33,9 @@ class Frontier(object):
                 if is_valid(url):
                     self.save[urlhash] = (url, False)
                     self.to_be_downloaded.append(url)
-                    self.logger.info(f"✅ Accepted seed: {url}")
+                    self.logger.info(f"Accepted seed: {url}")
                 else:
-                    self.logger.info(f"❌ Rejected seed: {url}")
+                    self.logger.info(f"Rejected seed: {url}")
             self.save.sync()
 
         else:
